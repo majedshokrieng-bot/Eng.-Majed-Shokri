@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيقات نظام 6S</title>
+    <style>
+        :root {
+            --bg: #0f1115;
+            --card: #171a21;
+            --accent-cam: #e8413a;
+            --accent-rep: #2a7de1;
+            --text: #f2f2f2;
+        }
+        * { box-sizing: border-box; }
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            background: var(--card);
+            padding: 30px 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        h1 { font-size: 22px; margin-bottom: 8px; }
+        p { color: #9aa0ab; font-size: 14px; margin-bottom: 24px; }
+        .btn { 
+            display: block; 
+            width: 100%; 
+            padding: 16px; 
+            margin: 12px 0; 
+            text-align: center; 
+            border-radius: 12px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            font-size: 16px; 
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-cam { background: var(--accent-cam); color: white; }
+        .btn-rep { background: var(--accent-rep); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>نظام إدارة تقارير 6S</h1>
+        <p>اختر التطبيق المطلوب لبدء العمل في الموقع الإنشائي</p>
+        <a class="btn btn-cam" href="6s_camera_app.html">📸 تشغيل تطبيق الكاميرا</a>[cite: 2]
+        <a class="btn btn-rep" href="6s_report_builder.html">📊 فتح منشئ تقارير Excel</a>[cite: 1]
+    </div>
+</body>
+</html>
