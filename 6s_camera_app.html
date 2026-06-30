@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>6S Photo App</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --accent:#e8413a; --accent2:#2a7de1;
+    --text:#f2f2f2; --muted:#9aa0ab; --green:#2ecc71;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',Tahoma,Arial,sans-serif; overflow:hidden;}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+  .screen{flex:1;display:none;flex-direction:column;padding:18px;overflow-y:auto;}
+  .screen.active{display:flex;}
+  h1{font-size:20px;margin:0 0 4px;color:var(--text);}
+  p.sub{color:var(--muted);font-size:13px;margin:0 0 18px;}
+  label{font-size:13px;color:var(--muted);margin-bottom:6px;display:block;}
+  input[type=text]{
+    width:100%;padding:14px;border-radius:10px;border:1px solid #2a2e38;
+    background:#1d212b;color:var(--text);font-size:16px;margin-bottom:16px;outline:none;
+  }
+  input[type=text]:focus{border-color:var(--accent2);}
+  .btn{
+    padding:14px 18px;border-radius:12px;border:none;font-size:16px;font-weight:600;
+    cursor:pointer;text-align:center;transition:transform .1s;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--accent2);color:#fff;}
+  .btn-primary:disabled{background:#3a3f4a;color:#777;}
+  .btn-green{background:var(--green);color:#04261a;}
+  .btn-outline{background:transparent;border:1px solid #444;color:var(--text);}
+  .btn-danger{background:var(--accent);color:#fff;}
+  .footer-bar{display:flex;gap:10px;padding:14px 18px;border-top:1px solid #20242e;background:var(--card);}
+  .footer-bar .btn{flex:1;}
+
+  /* Floor select */
+  .search-wrap{margin-bottom:10px;}
+  .group-title{font-size:12px;color:var(--accent2);margin:14px 0 8px;font-weight:700;letter-spacing:.5px;}
+  .floor-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .floor-btn{
+    background:#1d212b;border:1px solid #2a2e38;color:var(--text);border-radius:10px;
+    padding:14px 4px;font-size:14px;font-weight:600;cursor:pointer;position:relative;
+  }
+  .floor-btn.done{border-color:var(--green);}
+  .floor-btn.done::after{
+    content:'✓';position:absolute;top:2px;left:4px;color:var(--green);font-size:11px;
+  }
+  .floor-btn:active{background:#262b36;}
+
+  /* Camera screen */
+  #cameraScreen{padding:0;}
+  .cam-header{padding:12px 16px;background:var(--card);display:flex;justify-content:space-between;align-items:center;}
+  .cam-header .floor-label{font-size:16px;font-weight:700;color:var(--accent2);}
+  .cam-header .count{font-size:13px;color:var(--muted);}
+  #videoWrap{flex:1;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  #videoWrap .cam-frame{
+    position:relative; width:100%; aspect-ratio:1/1; max-height:100%; overflow:hidden;
+  }
+  video,#previewCanvas{width:100%;height:100%;object-fit:cover;display:block;}
+  #previewCanvas{display:none;position:absolute;inset:0;}
+  .shutter-row{display:flex;align-items:center;justify-content:center;gap:30px;padding:18px;background:var(--card);}
+  #shutterBtn{
+    width:74px;height:74px;border-radius:50%;background:#fff;border:5px solid #888;cursor:pointer;
+  }
+  #shutterBtn:active{background:#ddd;}
+  .thumbs{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;background:var(--card);border-top:1px solid #20242e;}
+  .thumbs img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #333;flex-shrink:0;}
+
+  /* small toast */
+  #toast{
+    position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+    background:rgba(20,20,20,.92);color:#fff;padding:10px 18px;border-radius:30px;
+    font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;
+  }
+  #toast.show{opacity:1;}
+
+  .meta-bar{background:var(--card);padding:8px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid #20242e;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SCREEN 1: Name + Project -->
+  <div class="screen active" id="screenStart">
+    <h1>6S Report — Basic Info</h1>
+    <p class="sub">Fill in your name and project name before starting</p>
+    <label>Your Name</label>
+    <input type="text" id="inputName" placeholder="e.g. Majed ...">
+    <label>Project Name</label>
+    <input type="text" id="inputProject" placeholder="e.g. Tower 391 - Dubai Creek Beach">
+    <div style="flex:1;"></div>
+    <button class="btn btn-primary" id="btnToFloors">Continue → Select Floor</button>
+  </div>
+
+  <!-- SCREEN 2: Floor select -->
+  <div class="screen" id="screenFloors">
+    <h1>Select Floor</h1>
+    <p class="sub" id="floorsSub">—</p>
+    <div class="search-wrap">
+      <input type="text" id="floorSearch" placeholder="Search: G, P1, F23, R1 ...">
+    </div>
+    <div id="floorListContainer"></div>
+  </div>
+
+  <!-- SCREEN 3: Camera -->
+  <div class="screen" id="cameraScreen">
+    <div class="cam-header">
+      <button class="btn btn-outline" style="padding:8px 14px;font-size:13px;" id="btnBackFloors">⟵ Change Floor</button>
+      <div>
+        <div class="floor-label" id="camFloorLabel">G</div>
+        <div class="count" id="camCount">0 photos</div>
+      </div>
+    </div>
+    <div class="meta-bar" id="metaBar">—</div>
+    <div id="videoWrap">
+      <div class="cam-frame">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="previewCanvas"></canvas>
+      </div>
+    </div>
+    <div class="thumbs" id="thumbsRow"></div>
+    <div class="shutter-row">
+      <button class="btn btn-outline" id="btnSwitchCam" style="flex:0 0 auto;padding:10px 14px;">🔄</button>
+      <button id="shutterBtn"></button>
+      <div style="width:48px;"></div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn btn-outline" id="btnDoneFloor">Done with this floor</button>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<canvas id="captureCanvas" style="display:none;"></canvas>
+
+<script>
+// ---------- State ----------
+const state = {
+  name:'', project:'', floor:null,
+  doneFloors:new Set(),
+  photoCounts:{}, // floor -> count
+  stream:null, facing:'environment'
+};
+
+// ---------- Floor list build ----------
+function buildFloorList(){
+  const list = [];
+  list.push({code:'G', group:'Ground / Parking'});
+  for(let i=1;i<=3;i++) list.push({code:'P'+i, group:'Ground / Parking'});
+  for(let i=1;i<=100;i++) list.push({code:'F'+i, group:'Floors'});
+  for(let i=1;i<=2;i++) list.push({code:'R'+i, group:'Roof'});
+  return list;
+}
+const FLOORS = buildFloorList();
+
+function renderFloorGrid(filter=''){
+  const container = document.getElementById('floorListContainer');
+  container.innerHTML = '';
+  const f = filter.trim().toUpperCase();
+  const groups = {};
+  FLOORS.forEach(item=>{
+    if(f && !item.code.toUpperCase().includes(f)) return;
+    if(!groups[item.group]) groups[item.group] = [];
+    groups[item.group].push(item);
+  });
+  Object.keys(groups).forEach(g=>{
+    const title = document.createElement('div');
+    title.className = 'group-title';
+    title.textContent = g;
+    container.appendChild(title);
+    const grid = document.createElement('div');
+    grid.className = 'floor-grid';
+    groups[g].forEach(item=>{
+      const btn = document.createElement('button');
+      btn.className = 'floor-btn' + (state.doneFloors.has(item.code) ? ' done' : '');
+      btn.textContent = item.code;
+      btn.onclick = ()=> selectFloor(item.code);
+      grid.appendChild(btn);
+    });
+    container.appendChild(grid);
+  });
+}
+
+function selectFloor(code){
+  state.floor = code;
+  document.getElementById('camFloorLabel').textContent = code;
+  updateCount();
+  showScreen('cameraScreen');
+  startCamera();
+}
+
+function updateCount(){
+  const n = state.photoCounts[state.floor] || 0;
+  document.getElementById('camCount').textContent = n + ' photos';
+}
+
+// ---------- Navigation ----------
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+document.getElementById('btnToFloors').onclick = ()=>{
+  const name = document.getElementById('inputName').value.trim();
+  const project = document.getElementById('inputProject').value.trim();
+  if(!name || !project){ toast('Please fill in name and project'); return; }
+  state.name = name; state.project = project;
+  document.getElementById('floorsSub').textContent = name + ' • ' + project;
+  renderFloorGrid();
+  showScreen('screenFloors');
+};
+
+document.getElementById('floorSearch').addEventListener('input', e=>{
+  renderFloorGrid(e.target.value);
+});
+
+document.getElementById('btnBackFloors').onclick = ()=>{
+  stopCamera();
+  renderFloorGrid(document.getElementById('floorSearch').value);
+  showScreen('screenFloors');
+};
+
+document.getElementById('btnDoneFloor').onclick = ()=>{
+  if(state.floor){ state.doneFloors.add(state.floor); }
+  stopCamera();
+  renderFloorGrid(document.getElementById('floorSearch').value);
+  showScreen('screenFloors');
+  toast('Saved photos for floor ' + state.floor);
+};
+
+// ---------- Camera ----------
+async function startCamera(){
+  try{
+    if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); }
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: state.facing, width:{ideal:1920}, height:{ideal:1080} },
+      audio:false
+    });
+    const video = document.getElementById('video');
+    video.srcObject = state.stream;
+  }catch(err){
+    toast('Could not access camera: ' + err.message);
+  }
+}
+function stopCamera(){
+  if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; }
+}
+document.getElementById('btnSwitchCam').onclick = ()=>{
+  state.facing = state.facing === 'environment' ? 'user' : 'environment';
+  startCamera();
+};
+
+// ---------- Capture + Watermark ----------
+function pad(n){ return n.toString().padStart(2,'0'); }
+function nowString(){
+  const d = new Date();
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+document.getElementById('shutterBtn').onclick = capturePhoto;
+
+function capturePhoto(){
+  const video = document.getElementById('video');
+  if(!video.videoWidth){ toast('Camera not ready yet'); return; }
+
+  // Crop the source video frame to a true 3:2 aspect ratio (no stretching)
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  const targetRatio = 1 / 1; // width:height
+  let cropW, cropH;
+  if (srcW / srcH > targetRatio) {
+    // source is wider than 3:2 -> crop width
+    cropH = srcH;
+    cropW = srcH * targetRatio;
+  } else {
+    // source is taller than 3:2 -> crop height
+    cropW = srcW;
+    cropH = srcW / targetRatio;
+  }
+  const cropX = (srcW - cropW) / 2;
+  const cropY = (srcH - cropH) / 2;
+
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width = cropW;
+  canvas.height = cropH;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+  // Build watermark lines
+  const lines = [
+    `${state.name}  •  ${state.project}`,
+    `Floor: ${state.floor}  •  ${nowString()}`
+  ];
+
+  const fontSize = Math.round(canvas.width * 0.018);
+  ctx.font = `bold ${fontSize}px Tahoma, Arial`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+
+  const paddingX = canvas.width * 0.025;
+  const lineHeight = fontSize * 1.5;
+  let y = canvas.height * 0.025;
+
+  for(let i=0;i<lines.length;i++){
+    const text = lines[i];
+    const textWidth = ctx.measureText(text).width;
+    const boxX = paddingX - 6;
+    const boxY = y - 3;
+    const boxW = textWidth + 12;
+    const boxH = fontSize + 8;
+    // white highlight background
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    // red text
+    ctx.fillStyle = '#d4231c';
+    ctx.fillText(text, paddingX, y);
+    y += lineHeight;
+  }
+
+  let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  dataUrl = embedMetadata(dataUrl, state.name, state.project, state.floor, Date.now());
+  addThumb(dataUrl);
+  downloadImage(dataUrl);
+
+  state.photoCounts[state.floor] = (state.photoCounts[state.floor]||0) + 1;
+  updateCount();
+  toast('Photo saved');
+}
+
+function embedMetadata(dataUrl, name, project, floor, ts){
+  try{
+    const payload = JSON.stringify({name, project, floor, ts});
+    const zeroth = {};
+    zeroth[piexif.ImageIFD.ImageDescription] = payload;
+    const exifObj = {"0th": zeroth, "Exif": {}, "GPS": {}};
+    const exifBytes = piexif.dump(exifObj);
+    return piexif.insert(exifBytes, dataUrl);
+  }catch(e){
+    console.error('EXIF embed failed', e);
+    return dataUrl; // fall back to plain image if EXIF write fails
+  }
+}
+
+function addThumb(dataUrl){
+  const row = document.getElementById('thumbsRow');
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  row.appendChild(img);
+  row.scrollLeft = row.scrollWidth;
+}
+
+function dataUrlToBlob(dataUrl){
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], {type: mime});
+}
+
+function downloadImage(dataUrl){
+  const fname = `6S_${state.project.replace(/\s+/g,'_')}_${state.floor}_${Date.now()}.jpg`;
+  const blob = dataUrlToBlob(dataUrl);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 3000);
+}
+
+// ---------- meta bar live clock ----------
+function refreshMeta(){
+  document.getElementById('metaBar').textContent =
+    `${state.name || '-'} • ${state.project || '-'} • ${nowString()}`;
+}
+setInterval(refreshMeta, 1000);
+
+// ---------- toast ----------
+let toastTimer=null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
